@@ -12,8 +12,8 @@ from streamlit_folium import st_folium
 
 
 def main():
-    bus_stop = gpd.read_file("data/06_交通/C0604_バスの状況/GIS/C06041_H22_バス停の状況_OP.shp", encoding="shift-jis")
-    bus_route = gpd.read_file("data/06_交通/C0604_バスの状況/GIS/C06042_H22_バス路線の状況_OP.shp", encoding="shift-jis")
+    bus_stop = gpd.read_file("data/C0604_バスの状況/GIS/C06041_H22_バス停の状況_OP.shp", encoding="shift-jis")
+    bus_route = gpd.read_file("data/C0604_バスの状況/GIS/C06042_H22_バス路線の状況_OP.shp", encoding="shift-jis")
 
     buffer_m = 10
     bs_bufferd = bus_stop.to_crs(epsg=3098).buffer(buffer_m)
@@ -25,7 +25,7 @@ def main():
         bs_hindo.append(bus_route[is_intersected]["B_HINDO"].max())
     bus_stop["hindo"] = bs_hindo
 
-    district = gpd.read_file("data/B002005212020DDSWC35203/r2kb35203.shp")
+    district = gpd.read_file("data/district/B002005212020DDSWC35203/r2kb35203.shp")
     district = district[district.KIHON1.astype(float) < 300]
 
     bs_point = bus_stop.to_crs(epsg=3098).geometry
