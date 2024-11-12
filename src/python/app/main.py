@@ -77,7 +77,45 @@ def main():
         layout="wide"
     )
     st.title("山口市交通機関身近度マップ")
-    st_folium(m, use_container_width=True, height=720, returned_objects=[])
+    st.markdown(
+        """
+        本サイトは、山口市の交通機関身近度を可視化したマップです。以下の機能を提供しています：
+
+        - **地域別の交通機関身近度**：地域ごとに最寄りのバス停までの距離を表示します。
+        - **バス停の利用頻度**：バス停ごとの利用頻度を表示します。
+        - **バス路線の利用頻度**：バス路線ごとの利用頻度を表示します。
+
+        交通機関身近度を確認することで、住宅選びや移動手段の検討に役立ててください。また、本サイトで使用しているデータの出典と加工内容についても記載していますので、ご参照ください。
+        """
+    )
+    with st.container(height=750):
+        st_folium(m, use_container_width=True, height=720, returned_objects=[])
+    st.markdown(
+            """
+            ##### 出典
+
+            本サイトで使用しているデータは、以下の出典から取得し、加工したものです：
+
+            1. **山口県オープンデータカタログサイト**
+               - ライセンス: [PDL1.0](https://www.digital.go.jp/resources/open_data/public_data_license_v1.0)
+               - データ: [【山口県】都市計画基礎調査結果](https://yamaguchi-opendata.jp/ckan/dataset/toshikeikakukisotyousa)
+               - 出典URL: [山口県オープンデータカタログサイト](https://yamaguchi-opendata.jp/)
+
+            2. **政府統計の総合窓口（e-Stat）**
+               - ライセンス: [利用規約](https://www.e-stat.go.jp/terms-of-use)
+               - データ: [境界データ](https://www.e-stat.go.jp/gis/statmap-search?type=2)
+               - 出典URL: [政府統計の総合窓口（e-Stat）](https://www.e-stat.go.jp/)
+
+            ##### 加工内容
+
+            本サイトで公開しているデータは、上記出典から取得したデータを元に加工したものです。具体的な加工内容は以下の通りです：
+
+            - 都市計画基礎調査結果データを統合して、地域別の詳細な分析を行いました。
+            - 境界データを使用して、地理情報システム（GIS）に適した形式に変換しました。
+
+            これらのデータは、山口県オープンデータカタログサイトおよび政府統計の総合窓口（e-Stat）に帰属しています。
+            """
+    )
 
 if __name__ == "__main__":
     main()
