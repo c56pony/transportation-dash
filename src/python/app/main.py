@@ -12,8 +12,8 @@ from streamlit_folium import st_folium
 
 
 def main():
-    bus_stop = gpd.read_file("data/C0604_バスの状況/GIS/C06041_H22_バス停の状況_OP.shp", encoding="shift-jis")
-    bus_route = gpd.read_file("data/C0604_バスの状況/GIS/C06042_H22_バス路線の状況_OP.shp", encoding="shift-jis")
+    bus_stop = gpd.read_file("data/bus/C0604_バスの状況/GIS/C06041_H22_バス停の状況_OP.shp", encoding="shift-jis")
+    bus_route = gpd.read_file("data/bus/C0604_バスの状況/GIS/C06042_H22_バス路線の状況_OP.shp", encoding="shift-jis")
 
     buffer_m = 10
     bs_bufferd = bus_stop.to_crs(epsg=3098).buffer(buffer_m)
