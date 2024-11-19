@@ -11,7 +11,7 @@ import streamlit as st
 from streamlit_folium import st_folium
 
 
-def main():
+def load_bus_data() -> tuple[gpd.GeoDataFrame, gpd.GeoDataFrame]:
     bus_stop = gpd.read_file("data/bus/C0604_バスの状況/GIS/C06041_H22_バス停の状況_OP.shp", encoding="shift-jis")
     bus_route = gpd.read_file("data/bus/C0604_バスの状況/GIS/C06042_H22_バス路線の状況_OP.shp", encoding="shift-jis")
 
@@ -24,10 +24,20 @@ def main():
         is_intersected = br_geometry.intersects(bs)
         bs_hindo.append(bus_route[is_intersected]["B_HINDO"].max())
     bus_stop["hindo"] = bs_hindo
+    return bus_stop, bus_route
 
+
+def load_district_data() -> gpd.GeoDataFrame:
     district = gpd.read_file("data/district/B002005212020DDSWC35203/r2kb35203.shp")
-    district = district[district.KIHON1.astype(float) < 300]
+    district = district[district.KIHON1.astype(float) < 400]
+    return district
 
+
+def smooth_saturation(x: np.ndarray, alpha: float = 0.05, max: float = 1.0) -> np.ndarray:
+    return (x + max - np.sqrt(alpha + (x - max) ** 2)) / 2
+
+
+def get_score(district: gpd.GeoDataFrame, bus_stop: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
     bs_point = bus_stop.to_crs(epsg=3098).geometry
     bs_point = np.array([(point.x, point.y) for point in bs_point])
     district_centroid = district.to_crs(epsg=3098).centroid
@@ -35,22 +45,47 @@ def main():
     nn = NearestNeighbors(n_neighbors=1)
     nn.fit(bs_point)
     distance, idx = nn.kneighbors(district_centroid)
+
+    idx = idx.flatten()
+    distance = distance.flatten()
+    hindo = bus_stop["hindo"][idx].to_numpy()
+    # score is scaled for simplicity
+#   hindo = np.array([100, 24, 12, 6])
+#   distance = np.array([10, 400, 800, 1600])
+#   hindo, distance = np.meshgrid(hindo, distance)
+#   hindo = hindo.flatten()
+#   distance = distance.flatten()
+    # hindo = 24 = 1 / 30min * 12h
+    # distance = 400 = 5km/h * 10min
+    score = 10 * smooth_saturation(hindo / 24) * smooth_saturation(400 / (distance + 1e-6))
+#   for h, d, s in zip(hindo, distance, score):
+#       print(f"hindo: {h}, distance: {d}, score: {s:.2f}")
+
+    district["bus_stop"] = bus_stop["B_NAME"][idx].values
     district["distance"] = distance
-    district["bus_stop"] = bus_stop["B_NAME"][idx.flatten()].values
-    district[["bus_stop", "distance"]].head(5)
+    district["hindo"] = hindo
+    district["score"] = score
+    return district
+
+
+def main():
+    bus_stop, bus_route = load_bus_data()
+    district = load_district_data()
+
+    district = get_score(district, bus_stop)
 
     m = folium.Map(location=(34.178293, 131.474129), zoom_start=15)
-    distance_cm = linear.YlGn_09.scale(0, 800) # 5km/h * 5min *2
+    score_cm = linear.YlGn_09.scale(0, 10)
     folium.GeoJson(
         district,
         style_function=lambda x: {
-            "fillColor": distance_cm(x["properties"]["distance"]),
+            "fillColor": score_cm(x["properties"]["score"]),
             "color": "black",
             "weight": 1,
             "dashArray": "5, 5",
             "fillOpacity": 0.7,
         },
-        tooltip=folium.GeoJsonTooltip(fields=["S_NAME", "bus_stop", "distance"]),
+        tooltip=folium.GeoJsonTooltip(fields=["S_NAME", "bus_stop", "distance", "hindo", "score"]),
     ).add_to(m)
     popup=folium.GeoJsonPopup(fields=["B_NAME", "hindo"])
     folium.GeoJson(
