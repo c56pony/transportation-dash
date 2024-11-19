@@ -1,79 +1,20 @@
-#!/usr/bin/env python
-# coding: utf-8
-
-import folium
 from branca.colormap import linear
+import folium
 import geopandas as gpd
-from sklearn.neighbors import NearestNeighbors
-import numpy as np
-
 import streamlit as st
 from streamlit_folium import st_folium
 
-
-def load_bus_data() -> tuple[gpd.GeoDataFrame, gpd.GeoDataFrame]:
-    bus_stop = gpd.read_file("data/bus/C0604_バスの状況/GIS/C06041_H22_バス停の状況_OP.shp", encoding="shift-jis")
-    bus_route = gpd.read_file("data/bus/C0604_バスの状況/GIS/C06042_H22_バス路線の状況_OP.shp", encoding="shift-jis")
-
-    buffer_m = 10
-    bs_bufferd = bus_stop.to_crs(epsg=3098).buffer(buffer_m)
-    br_geometry = bus_route.to_crs(epsg=3098).geometry
-
-    bs_hindo = []
-    for bs in bs_bufferd:
-        is_intersected = br_geometry.intersects(bs)
-        bs_hindo.append(bus_route[is_intersected]["B_HINDO"].max())
-    bus_stop["hindo"] = bs_hindo
-    return bus_stop, bus_route
+from data import load_bus_data, load_district_data, get_score
 
 
-def load_district_data() -> gpd.GeoDataFrame:
-    district = gpd.read_file("data/district/B002005212020DDSWC35203/r2kb35203.shp")
-#   district = district[district.KIHON1.astype(float) < 400]
-    return district
-
-
-def smooth_saturation(x: np.ndarray, alpha: float = 0.05, max: float = 1.0) -> np.ndarray:
-    return (x + max - np.sqrt(alpha + (x - max) ** 2)) / 2
-
-
-def get_score(district: gpd.GeoDataFrame, bus_stop: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
-    bs_point = bus_stop.to_crs(epsg=3098).geometry
-    bs_point = np.array([(point.x, point.y) for point in bs_point])
-    district_centroid = district.to_crs(epsg=3098).centroid
-    district_centroid = np.array([(point.x, point.y) for point in district_centroid])
-    nn = NearestNeighbors(n_neighbors=1)
-    nn.fit(bs_point)
-    distance, idx = nn.kneighbors(district_centroid)
-
-    idx = idx.flatten()
-    distance = distance.flatten()
-    hindo = bus_stop["hindo"][idx].to_numpy()
-    # score is scaled for simplicity
-#   hindo = np.array([100, 24, 12, 6])
-#   distance = np.array([10, 400, 800, 1600])
-#   hindo, distance = np.meshgrid(hindo, distance)
-#   hindo = hindo.flatten()
-#   distance = distance.flatten()
-    # hindo = 24 = 1 / 30min * 12h
-    # distance = 400 = 5km/h * 10min
-    score = 10 * smooth_saturation(hindo / 24) * smooth_saturation(400 / (distance + 1e-6))
-#   for h, d, s in zip(hindo, distance, score):
-#       print(f"hindo: {h}, distance: {d}, score: {s:.2f}")
-
-    district["bus_stop"] = bus_stop["B_NAME"][idx].values
-    district["distance"] = distance
-    district["hindo"] = hindo
-    district["score"] = score
-    return district
-
-
-def main():
+def read_and_process_data() -> tuple[gpd.GeoDataFrame, gpd.GeoDataFrame, gpd.GeoDataFrame]:
     bus_stop, bus_route = load_bus_data()
     district = load_district_data()
-
     district = get_score(district, bus_stop)
+    return district, bus_stop, bus_route
 
+
+def generate_map(district: gpd.GeoDataFrame, stop: gpd.GeoDataFrame, route: gpd.GeoDataFrame) -> folium.Map:
     m = folium.Map(location=(34.178293, 131.474129), zoom_start=15)
     score_cm = linear.viridis.scale(0, 10)
     folium.GeoJson(
@@ -89,7 +30,7 @@ def main():
     ).add_to(m)
     popup=folium.GeoJsonPopup(fields=["B_NAME", "hindo"])
     folium.GeoJson(
-        bus_stop,
+        stop,
         popup=popup,
         marker=folium.Marker(icon=folium.Icon(icon='star')),
         style_function=lambda x: {
@@ -98,7 +39,7 @@ def main():
     ).add_to(m)
     hindo_cm = linear.YlGn_09.scale(0, 25)
     folium.GeoJson(
-        bus_route,
+        route,
         style_function=lambda x: {
             "color": hindo_cm(x["properties"]["B_HINDO"]),
             "weight": 5,
@@ -107,7 +48,10 @@ def main():
     score_cm.caption = "Score color scale"
     score_cm.add_to(m)
     folium.LayerControl().add_to(m)
+    return m
 
+
+def main():
     st.set_page_config(
         page_title="山口市交通機関身近度マップ",
         page_icon="🚌",
@@ -125,8 +69,12 @@ def main():
         交通機関身近度を確認することで、住宅選びや移動手段の検討に役立ててください。また、本サイトで使用しているデータの出典と加工内容についても記載していますので、ご参照ください。
         """
     )
+
+    district, stop, route = read_and_process_data()
+    map = generate_map(district, stop, route)
     with st.container(height=750):
-        st_folium(m, use_container_width=True, height=720, returned_objects=[])
+        st_folium(map, use_container_width=True, height=720, returned_objects=[])
+
     st.markdown(
             """
             ##### 出典
