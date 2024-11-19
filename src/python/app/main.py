@@ -29,7 +29,7 @@ def load_bus_data() -> tuple[gpd.GeoDataFrame, gpd.GeoDataFrame]:
 
 def load_district_data() -> gpd.GeoDataFrame:
     district = gpd.read_file("data/district/B002005212020DDSWC35203/r2kb35203.shp")
-    district = district[district.KIHON1.astype(float) < 400]
+#   district = district[district.KIHON1.astype(float) < 400]
     return district
 
 
@@ -75,7 +75,7 @@ def main():
     district = get_score(district, bus_stop)
 
     m = folium.Map(location=(34.178293, 131.474129), zoom_start=15)
-    score_cm = linear.YlGn_09.scale(0, 10)
+    score_cm = linear.viridis.scale(0, 10)
     folium.GeoJson(
         district,
         style_function=lambda x: {
@@ -103,8 +103,10 @@ def main():
             "color": hindo_cm(x["properties"]["B_HINDO"]),
             "weight": 5,
         },
-        tooltip=folium.GeoJsonTooltip(fields=["B_ROSEN", "B_HINDO"]),
     ).add_to(m)
+    score_cm.caption = "Score color scale"
+    score_cm.add_to(m)
+    folium.LayerControl().add_to(m)
 
     st.set_page_config(
         page_title="山口市交通機関身近度マップ",
