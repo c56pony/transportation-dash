@@ -72,8 +72,7 @@ def main():
 
     district, stop, route = read_and_process_data()
     map = generate_map(district, stop, route)
-    with st.container(height=750):
-        st_folium(map, use_container_width=True, height=720, returned_objects=[])
+    st_folium(map, use_container_width=True, height=720, returned_objects=[])
 
     st.markdown(
             """
