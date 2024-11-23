@@ -4,14 +4,7 @@ import geopandas as gpd
 import streamlit as st
 from streamlit_folium import st_folium
 
-from data import load_bus_data, load_district_data, get_score
-
-
-def read_and_process_data() -> tuple[gpd.GeoDataFrame, gpd.GeoDataFrame, gpd.GeoDataFrame]:
-    bus_stop, bus_route = load_bus_data()
-    district = load_district_data()
-    district = get_score(district, bus_stop)
-    return district, bus_stop, bus_route
+from data import read_and_process_data
 
 
 def generate_map(district: gpd.GeoDataFrame, stop: gpd.GeoDataFrame, route: gpd.GeoDataFrame) -> folium.Map:
@@ -26,9 +19,9 @@ def generate_map(district: gpd.GeoDataFrame, stop: gpd.GeoDataFrame, route: gpd.
             "dashArray": "5, 5",
             "fillOpacity": 0.7,
         },
-        tooltip=folium.GeoJsonTooltip(fields=["S_NAME", "bus_stop", "distance", "hindo", "score"]),
+        tooltip=folium.GeoJsonTooltip(fields=["S_NAME", "name", "type", "distance", "hindo", "score"]),
     ).add_to(m)
-    popup=folium.GeoJsonPopup(fields=["B_NAME", "hindo"])
+    popup=folium.GeoJsonPopup(fields=["NAME", "HINDO"])
     folium.GeoJson(
         stop,
         popup=popup,
@@ -37,11 +30,10 @@ def generate_map(district: gpd.GeoDataFrame, stop: gpd.GeoDataFrame, route: gpd.
             "markerColor": "red"
         },
     ).add_to(m)
-    hindo_cm = linear.YlGn_09.scale(0, 25)
     folium.GeoJson(
         route,
         style_function=lambda x: {
-            "color": hindo_cm(x["properties"]["B_HINDO"]),
+            "color": "black",
             "weight": 5,
         },
     ).add_to(m)
