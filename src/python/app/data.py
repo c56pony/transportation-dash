@@ -35,9 +35,9 @@ def load_bus_data() -> tuple[gpd.GeoDataFrame, gpd.GeoDataFrame]:
     stop, route = load_stop_route(BUS_STOP_PATH, BUS_ROUTE_PATH)
     stop = stop.rename(columns={"B_NAME": "NAME", "B_ROSEN": "ROSEN"})
     stop["HINDO"] = get_b_hindo(stop, route)
-    stop["TYPE"] = "バス"
+    stop["TYPE"] = "bus"
     stop = stop[STOP_COLUMNS]
-    route["TYPE"] = "バス"
+    route["TYPE"] = "bus"
     route = route[ROUTE_COLUMNS]
     return stop, route
 
@@ -45,9 +45,9 @@ def load_bus_data() -> tuple[gpd.GeoDataFrame, gpd.GeoDataFrame]:
 def load_train_data() -> tuple[gpd.GeoDataFrame, gpd.GeoDataFrame]:
     stop, route = load_stop_route(TRAIN_STATION_PATH, TRAIN_ROUTE_PATH)
     stop = stop.rename(columns={"EKI_NAME": "NAME", "T_HIND": "HINDO", "T_ROSEN": "ROSEN"})
-    stop["TYPE"] = "電車"
+    stop["TYPE"] = "train"
     stop = stop[STOP_COLUMNS]
-    route["TYPE"] = "電車"
+    route["TYPE"] = "train"
     route = route[ROUTE_COLUMNS]
     return stop, route
 

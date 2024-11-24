@@ -21,20 +21,33 @@ def generate_map(district: gpd.GeoDataFrame, stop: gpd.GeoDataFrame, route: gpd.
         },
         tooltip=folium.GeoJsonTooltip(fields=["S_NAME", "name", "type", "distance", "hindo", "score"]),
     ).add_to(m)
+
+    icon_colors = {"bus": "darkblue", "train": "darkred"}
     popup=folium.GeoJsonPopup(fields=["NAME", "HINDO"])
     folium.GeoJson(
         stop,
         popup=popup,
-        marker=folium.Marker(icon=folium.Icon(icon='star')),
+        marker=folium.Marker(icon=folium.Icon(prefix='fa')),
         style_function=lambda x: {
-            "markerColor": "red"
+            "icon": x["properties"]["TYPE"],
+            "markerColor": icon_colors[x["properties"]["TYPE"]],
         },
     ).add_to(m)
+
+    route_colors = {
+        "blue": "#43A9E2",
+        "green": "#76B000",
+        "red": "#D14020",
+        "orange": "#F19800",
+        "darkblue": "#1266A8",
+        "darkgreen": "#738300",
+        "darkred": "#983232",
+    }
     folium.GeoJson(
         route,
         style_function=lambda x: {
-            "color": "black",
-            "weight": 5,
+            "color": route_colors[icon_colors[x["properties"]["TYPE"]]],
+            "weight": 3,
         },
     ).add_to(m)
     score_cm.caption = "Score color scale"
