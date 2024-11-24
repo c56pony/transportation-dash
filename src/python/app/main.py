@@ -12,6 +12,7 @@ def generate_map(district: gpd.GeoDataFrame, stop: gpd.GeoDataFrame, route: gpd.
     score_cm = linear.viridis.scale(0, 10)
     folium.GeoJson(
         district,
+        name="アクセス度",
         style_function=lambda x: {
             "fillColor": score_cm(x["properties"]["score"]),
             "color": "black",
@@ -26,6 +27,7 @@ def generate_map(district: gpd.GeoDataFrame, stop: gpd.GeoDataFrame, route: gpd.
     popup=folium.GeoJsonPopup(fields=["NAME", "HINDO"])
     folium.GeoJson(
         stop,
+        name="駅・バス停",
         popup=popup,
         marker=folium.Marker(icon=folium.Icon(prefix='fa')),
         style_function=lambda x: {
@@ -45,12 +47,13 @@ def generate_map(district: gpd.GeoDataFrame, stop: gpd.GeoDataFrame, route: gpd.
     }
     folium.GeoJson(
         route,
+        name="路線",
         style_function=lambda x: {
             "color": route_colors[icon_colors[x["properties"]["TYPE"]]],
             "weight": 3,
         },
     ).add_to(m)
-    score_cm.caption = "Score color scale"
+    score_cm.caption = "アクセス度"
     score_cm.add_to(m)
     folium.LayerControl().add_to(m)
     return m
@@ -58,20 +61,20 @@ def generate_map(district: gpd.GeoDataFrame, stop: gpd.GeoDataFrame, route: gpd.
 
 def main():
     st.set_page_config(
-        page_title="山口市交通機関身近度マップ",
+        page_title="山口市交通機関アクセス度マップ",
         page_icon="🚌",
         layout="wide"
     )
-    st.title("山口市交通機関身近度マップ")
+    st.title("山口市交通機関アクセス度マップ")
     st.markdown(
         """
-        本サイトは、山口市の交通機関身近度を可視化したマップです。以下の機能を提供しています：
+        本サイトは、山口市の交通機関アクセス度を可視化したマップです。以下の機能を提供しています：
 
-        - **地域別の交通機関身近度**：地域ごとに最寄りのバス停までの距離を表示します。
+        - **地域別の交通機関アクセス度**：地域ごとに最寄りのバス停までの距離を表示します。
         - **バス停の利用頻度**：バス停ごとの利用頻度を表示します。
         - **バス路線の利用頻度**：バス路線ごとの利用頻度を表示します。
 
-        交通機関身近度を確認することで、住宅選びや移動手段の検討に役立ててください。また、本サイトで使用しているデータの出典と加工内容についても記載していますので、ご参照ください。
+        交通機関アクセス度を確認することで、住宅選びや移動手段の検討に役立ててください。また、本サイトで使用しているデータの出典と加工内容についても記載していますので、ご参照ください。
         """
     )
 
