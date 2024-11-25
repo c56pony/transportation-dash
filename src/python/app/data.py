@@ -82,17 +82,19 @@ def eval_score(district: gpd.GeoDataFrame, stop: gpd.GeoDataFrame) -> gpd.GeoDat
     st_point = np.array([(point.x, point.y) for point in st_point])
     district_centroid = district.to_crs(epsg=3098).centroid
     district_centroid = np.array([(point.x, point.y) for point in district_centroid])
-    nn = NearestNeighbors(n_neighbors=1)
+    nn = NearestNeighbors(n_neighbors=5)
     nn.fit(st_point)
     distance, idx = nn.kneighbors(district_centroid)
 
-    idx = idx.flatten()
-    distance = distance.flatten()
-    hindo = stop["HINDO"][idx].to_numpy()
-    # score is scaled for simplicity
+    hindo = stop["HINDO"].to_numpy()[idx]
     score_h = score_func(hindo, min=HINDO_MIN, max=HINDO_MAX)
     score_d = 1 - score_func(distance, min=DISTANCE_MIN, max=DISTANCE_MAX)
     score = SCORE_MAX * np.sqrt(score_h * score_d)
+    idx_neighbour = np.argmax(score, axis=1)
+    idx = idx[np.arange(idx.shape[0]), idx_neighbour]
+    hindo = hindo[np.arange(hindo.shape[0]), idx_neighbour]
+    distance = distance[np.arange(distance.shape[0]), idx_neighbour]
+    score = score[np.arange(score.shape[0]), idx_neighbour]
 
     district["name"] = stop["NAME"][idx].values
     district["type"] = stop["TYPE"][idx].values
