@@ -2,6 +2,7 @@ import geopandas as gpd
 from sklearn.neighbors import NearestNeighbors
 import pandas as pd
 import numpy as np
+import matplotlib.pyplot as plt
 
 
 BUS_STOP_PATH = "data/bus/C0604_バスの状況/GIS/C06041_H22_バス停の状況_OP.shp"
@@ -12,6 +13,11 @@ STOP_COLUMNS = ["NAME", "HINDO", "ROSEN", "TYPE", "geometry"]
 ROUTE_COLUMNS = ["TYPE", "geometry"]
 DISTRICT_PATH = "data/district/B002005212020DDSWC35203/r2kb35203.shp"
 DISTRICT_COLUMNS = ["S_NAME", "geometry"]
+SCORE_MAX = 10
+HINDO_MAX = 144  # 144 / day = 1 / 5 min * 12 h
+HINDO_MIN = 0.5
+DISTANCE_MAX = 2400  # 1200 m = 5 km/h * 60 min
+DISTANCE_MIN = 40  # 40 m = 5 km/h * 1 min
 
 
 def get_b_hindo(stop: gpd.GeoDataFrame, route: gpd.GeoDataFrame, buffer_m: float = 10) -> list[float]:
@@ -61,8 +67,14 @@ def load_district_data() -> gpd.GeoDataFrame:
 
 # smooth saturation function
 # citation: https://ieeexplore.ieee.org/document/9997143
-def smooth_saturation(x: np.ndarray, alpha: float = 0.05, max: float = 1.0) -> np.ndarray:
-    return (x + max - np.sqrt(alpha + (x - max) ** 2)) / 2
+def smooth_saturation(x: np.ndarray, alpha: float = 0.001, max: float = 1.0, min: float = 0.0) -> np.ndarray:
+    return (max - np.sqrt(alpha + (x - max) ** 2)) / 2 + \
+           (min + np.sqrt(alpha + (x - min) ** 2)) / 2
+
+
+def score_func(x: np.ndarray, min: float = 1.0, max: float = 10.0) -> np.ndarray:
+    x = np.log(x / min) / np.log(max / min)
+    return smooth_saturation(x)
 
 
 def eval_score(district: gpd.GeoDataFrame, stop: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
@@ -78,16 +90,9 @@ def eval_score(district: gpd.GeoDataFrame, stop: gpd.GeoDataFrame) -> gpd.GeoDat
     distance = distance.flatten()
     hindo = stop["HINDO"][idx].to_numpy()
     # score is scaled for simplicity
-#   hindo = np.array([100, 24, 12, 6])
-#   distance = np.array([10, 400, 800, 1600])
-#   hindo, distance = np.meshgrid(hindo, distance)
-#   hindo = hindo.flatten()
-#   distance = distance.flatten()
-    # hindo = 24 = 1 / 30min * 12h
-    # distance = 400 = 5km/h * 10min
-    score = 10 * smooth_saturation(hindo / 24) * smooth_saturation(400 / (distance + 1e-6))
-#   for h, d, s in zip(hindo, distance, score):
-#       print(f"hindo: {h}, distance: {d}, score: {s:.2f}")
+    score_h = score_func(hindo, min=HINDO_MIN, max=HINDO_MAX)
+    score_d = 1 - score_func(distance, min=DISTANCE_MIN, max=DISTANCE_MAX)
+    score = SCORE_MAX * np.sqrt(score_h * score_d)
 
     district["name"] = stop["NAME"][idx].values
     district["type"] = stop["TYPE"][idx].values
@@ -106,6 +111,17 @@ def read_and_process_data() -> tuple[gpd.GeoDataFrame, gpd.GeoDataFrame, gpd.Geo
     district = eval_score(district, stop)
     return district, stop, route
 
+# scoreのhistogramを作成。縦軸はscoreの個数、横軸はscoreの値
+def plot_score_hist(district: gpd.GeoDataFrame, key: str = "score", range: tuple[float] | None = None) -> None:
+    _, ax = plt.subplots()
+    ax.hist(district[key], bins="auto", range=range)
+    ax.set_xlabel(key)
+    ax.set_ylabel("count")
+    plt.show()
+
+
 if __name__ == "__main__":
     district, stop, route = read_and_process_data()
     print(district.head())
+    print(district["score"].describe())
+    plot_score_hist(district, key="score")
