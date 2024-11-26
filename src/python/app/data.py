@@ -29,7 +29,7 @@ def get_b_hindo(stop: gpd.GeoDataFrame, route: gpd.GeoDataFrame, buffer_m: float
         is_intersected = rt_geometry.intersects(st)
         hindo.append(route[is_intersected]["B_HINDO"].max())
     return hindo
-    
+
 
 def load_stop_route(stop_path: str, route_path: str) -> tuple[gpd.GeoDataFrame, gpd.GeoDataFrame]:
     stop = gpd.read_file(stop_path, encoding="shift-jis")
@@ -113,7 +113,7 @@ def read_and_process_data() -> tuple[gpd.GeoDataFrame, gpd.GeoDataFrame, gpd.Geo
     district = eval_score(district, stop)
     return district, stop, route
 
-# scoreのhistogramを作成。縦軸はscoreの個数、横軸はscoreの値
+
 def plot_score_hist(district: gpd.GeoDataFrame, key: str = "score", range: tuple[float] | None = None) -> None:
     _, ax = plt.subplots()
     ax.hist(district[key], bins="auto", range=range)
