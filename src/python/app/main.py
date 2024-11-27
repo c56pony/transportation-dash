@@ -1,7 +1,8 @@
-from branca.colormap import linear
+import cmcrameri.cm as cmc
 import folium
 import geopandas as gpd
 import streamlit as st
+from branca.colormap import linear, LinearColormap
 from streamlit_folium import st_folium
 
 from data import read_and_process_data
@@ -10,6 +11,8 @@ from data import read_and_process_data
 def generate_map(district: gpd.GeoDataFrame, stop: gpd.GeoDataFrame, route: gpd.GeoDataFrame) -> folium.Map:
     m = folium.Map(location=(34.178293, 131.474129), zoom_start=15)
     score_cm = linear.viridis.scale(0, 10)
+    score_cm = [tuple(rgb) for rgb in cmc.batlow.colors.tolist()]
+    score_cm = LinearColormap(score_cm, vmin=0, vmax=10)
     folium.GeoJson(
         district,
         name="アクセス度",
@@ -24,7 +27,7 @@ def generate_map(district: gpd.GeoDataFrame, stop: gpd.GeoDataFrame, route: gpd.
     ).add_to(m)
 
     icon_colors = {"bus": "darkblue", "train": "darkred"}
-    popup=folium.GeoJsonPopup(fields=["NAME", "HINDO"])
+    popup = folium.GeoJsonPopup(fields=["NAME", "HINDO"])
     folium.GeoJson(
         stop,
         name="駅・バス停",
@@ -108,6 +111,7 @@ def main():
             これらのデータは、山口県オープンデータカタログサイトおよび政府統計の総合窓口（e-Stat）に帰属しています。
             """
     )
+
 
 if __name__ == "__main__":
     main()
