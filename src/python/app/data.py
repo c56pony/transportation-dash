@@ -12,7 +12,7 @@ TRAIN_ROUTE_PATH = "data/train/C0603_鉄道・路面電車等の状況/GIS/C0603
 STOP_COLUMNS = ["NAME", "HINDO", "ROSEN", "TYPE", "geometry"]
 ROUTE_COLUMNS = ["TYPE", "geometry"]
 DISTRICT_PATH = "data/district/B002005212020DDSWC35203/r2kb35203.shp"
-DISTRICT_COLUMNS = ["S_NAME", "geometry"]
+DISTRICT_COLUMNS = ["S_NAME", "geometry", "cluster"]
 SCORE_MAX = 10
 HINDO_MAX = 144  # 144 / day = 1 / 5 min * 12 h
 HINDO_MIN = 0.5
@@ -59,9 +59,102 @@ def load_train_data() -> tuple[gpd.GeoDataFrame, gpd.GeoDataFrame]:
 
 
 def load_district_data() -> gpd.GeoDataFrame:
-    district = gpd.read_file("data/district/B002005212020DDSWC35203/r2kb35203.shp")
+    district = gpd.read_file(DISTRICT_PATH)
+    district["cluster"] = "白石"
+    # S_NAMEが'大内'から始まる単語ならば、clusterに'大内'に設定し、それ以外は変更しない
+    dict_cluster = {
+        "大内": "大内",
+        "宮島町": "大内",
+        "上小鯖": "小鯖",
+        "下小鯖": "小鯖",
+        "仁保": "仁保",
+        "平井": "平川",
+        "黒川": "平川",
+        "吉田": "平川",
+        "小郡": "小郡",
+        "陶": "陶",
+        "名田島": "名田島",
+        "鋳銭司": "鋳銭司",
+        "阿知須": "阿知須",
+        "秋穂二島": "秋穂二島",
+        "秋穂東": "秋穂",
+        "秋穂西": "秋穂",
+        "徳地": "徳地",
+        "阿東": "阿東",
+        "吉敷": "吉敷",
+        "維新公園": "吉敷",
+        "中尾": "吉敷",
+        "朝田": "大歳",
+        "矢原": "大歳",
+        "今井町": "大歳",
+        "富田原町": "大歳",
+        "周布町": "大歳",
+        "若宮町": "大歳",
+        "幸町": "大歳",
+        "宝町": "大歳",
+        "穂積町": "大歳",
+        "葵一丁目": "大歳",
+        "葵二丁目": "大歳",
+        "天花": "大殿",
+        "上天花町": "大殿",
+        "香山町": "大殿",
+        "木町": "大殿",
+        "野田": "大殿",
+        "堂の前町": "大殿",
+        "金古曽町": "大殿",
+        "円政寺": "大殿",
+        "新馬場": "大殿",
+        "道祖町": "大殿",
+        "石観音町": "大殿",
+        "古熊": "大殿",
+        "滝町": "大殿",
+        "大手町": "大殿",
+        "春日町": "大殿",
+        "上竪小路": "大殿",
+        "下竪小路": "大殿",
+        "久保小路": "大殿",
+        "銭湯小路": "大殿",
+        "諸願小路": "大殿",
+        "後河原": "大殿",
+        "水の上町": "大殿",
+        "八幡馬場": "大殿",
+        "大市町": "大殿",
+        "大殿大路": "大殿",
+        "三の宮": "大殿",
+        "上宇野令": "大殿",
+        "宮野": "宮野",
+        "江良": "宮野",
+        "桜畠": "宮野",
+        "平野": "宮野",
+        "折本": "宮野",
+        "芝崎町": "宮野",
+        "青葉台": "宮野",
+        "七尾台": "宮野",
+        "緑ヶ丘": "宮野",
+        "湯田": "湯田",
+        "前町": "湯田",
+        "朝倉町": "湯田",
+        "元町": "湯田",
+        "下市町": "湯田",
+        "熊野町": "湯田",
+        "赤妻町": "湯田",
+        "泉町": "湯田",
+        "錦町": "湯田",
+        "楠木町": "湯田",
+        "神田町": "湯田",
+        "荻町": "湯田",
+        "泉都町": "湯田",
+        "松美町": "湯田",
+        "三和町": "湯田",
+        "下宇野令": "湯田",
+        "嘉川": "嘉川",
+        "江崎": "嘉川",
+        "深溝": "嘉川",
+        "佐山": "佐山",
+    }
+    for k, v in dict_cluster.items():
+        district.loc[district.S_NAME.str.startswith(k), 'cluster'] = v
     district = district[DISTRICT_COLUMNS]
-#   district = district[district.KIHON1.astype(float) < 400]
     return district
 
 
@@ -114,6 +207,19 @@ def read_and_process_data() -> tuple[gpd.GeoDataFrame, gpd.GeoDataFrame, gpd.Geo
     return district, stop, route
 
 
+def filter_by_cluster(
+        district: gpd.GeoDataFrame,
+        stop: gpd.GeoDataFrame,
+        route: gpd.GeoDataFrame,
+        clusters: list[str],
+        ) -> tuple[gpd.GeoDataFrame, gpd.GeoDataFrame, gpd.GeoDataFrame]:
+    district = district[district["cluster"].isin(clusters)]
+    district_geometry = district.to_crs(epsg=3098).union_all().buffer(100)
+    stop = stop[stop.to_crs(epsg=3098).geometry.within(district_geometry)]
+    route = route[route.to_crs(epsg=3098).geometry.within(district_geometry)]
+    return district, stop, route
+
+
 def plot_score_hist(district: gpd.GeoDataFrame, key: str = "score", range: tuple[float] | None = None) -> None:
     _, ax = plt.subplots()
     ax.hist(district[key], bins="auto", range=range)
@@ -124,6 +230,10 @@ def plot_score_hist(district: gpd.GeoDataFrame, key: str = "score", range: tuple
 
 if __name__ == "__main__":
     district, stop, route = read_and_process_data()
-    print(district.head())
+    print(district.cluster.value_counts())
+    print(district.shape, stop.shape, route.shape)
+    print(f"{len(district)} districts, {len(stop)} stops, {len(route)} routes")
+    district, stop, route = filter_by_cluster(district, stop, route, ["白石", "大殿", "湯田"])
+    print(f"{len(district)} districts, {len(stop)} stops, {len(route)} routes")
     print(district["score"].describe())
-    plot_score_hist(district, key="score")
+#   plot_score_hist(district, key="score")
