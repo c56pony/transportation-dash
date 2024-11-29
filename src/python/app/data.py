@@ -34,11 +34,19 @@ def get_b_hindo(stop: gpd.GeoDataFrame, route: gpd.GeoDataFrame, buffer_m: float
 def load_stop_route(stop_path: str, route_path: str) -> tuple[gpd.GeoDataFrame, gpd.GeoDataFrame]:
     stop = gpd.read_file(stop_path, encoding="shift-jis")
     route = gpd.read_file(route_path, encoding="shift-jis")
+
     return stop, route
 
 
 def load_bus_data() -> tuple[gpd.GeoDataFrame, gpd.GeoDataFrame]:
     stop, route = load_stop_route(BUS_STOP_PATH, BUS_ROUTE_PATH)
+
+    # remove duplicated stops, sort by name length
+    stop["geometry"] = stop.normalize()
+    stop["len_B_NAME"] = stop["B_NAME"].str.len()
+    stop = stop.sort_values(["len_B_NAME", "B_NAME"], ascending=True)
+    stop = stop.drop_duplicates("geometry", keep="first")
+
     stop = stop.rename(columns={"B_NAME": "NAME", "B_ROSEN": "ROSEN"})
     stop["HINDO"] = get_b_hindo(stop, route)
     stop["TYPE"] = "bus"
