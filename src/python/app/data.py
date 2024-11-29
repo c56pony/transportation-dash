@@ -61,7 +61,6 @@ def load_train_data() -> tuple[gpd.GeoDataFrame, gpd.GeoDataFrame]:
 def load_district_data() -> gpd.GeoDataFrame:
     district = gpd.read_file(DISTRICT_PATH)
     district["cluster"] = "白石"
-    # S_NAMEが'大内'から始まる単語ならば、clusterに'大内'に設定し、それ以外は変更しない
     dict_cluster = {
         "大内": "大内",
         "宮島町": "大内",
@@ -191,6 +190,7 @@ def eval_score(district: gpd.GeoDataFrame, stop: gpd.GeoDataFrame) -> gpd.GeoDat
 
     district["name"] = stop["NAME"][idx].values
     district["type"] = stop["TYPE"][idx].values
+    district["type_ja"] = district["type"].replace({"bus": "バス停", "train": "駅"})
     district["distance"] = distance.round()
     district["hindo"] = hindo
     district["score"] = score.round(2)
