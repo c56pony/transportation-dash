@@ -191,9 +191,9 @@ def eval_score(district: gpd.GeoDataFrame, stop: gpd.GeoDataFrame) -> gpd.GeoDat
 
     district["name"] = stop["NAME"][idx].values
     district["type"] = stop["TYPE"][idx].values
-    district["distance"] = distance
+    district["distance"] = distance.round()
     district["hindo"] = hindo
-    district["score"] = score
+    district["score"] = score.round(2)
     return district
 
 
@@ -212,11 +212,12 @@ def filter_by_cluster(
         stop: gpd.GeoDataFrame,
         route: gpd.GeoDataFrame,
         clusters: list[str],
+        buffer_m: float = 1000,
         ) -> tuple[gpd.GeoDataFrame, gpd.GeoDataFrame, gpd.GeoDataFrame]:
     district = district[district["cluster"].isin(clusters)]
-    district_geometry = district.to_crs(epsg=3098).union_all().buffer(100)
+    district_geometry = district.to_crs(epsg=3098).union_all().buffer(buffer_m)
     stop = stop[stop.to_crs(epsg=3098).geometry.within(district_geometry)]
-    route = route[route.to_crs(epsg=3098).geometry.within(district_geometry)]
+    route = route[route.to_crs(epsg=3098).geometry.intersects(district_geometry)]
     return district, stop, route
 
 

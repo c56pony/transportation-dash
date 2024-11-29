@@ -2,70 +2,88 @@ import cmcrameri.cm as cmc
 import folium
 import geopandas as gpd
 import streamlit as st
-from branca.colormap import linear, LinearColormap
+from branca.colormap import LinearColormap
+from shapely.geometry import Point
 from streamlit_folium import st_folium
 
 from data import read_and_process_data, filter_by_cluster
 
 
-def generate_map(district: gpd.GeoDataFrame, stop: gpd.GeoDataFrame, route: gpd.GeoDataFrame) -> folium.Map:
+@st.cache_data()
+def get_data() -> tuple[gpd.GeoDataFrame, gpd.GeoDataFrame, gpd.GeoDataFrame]:
+    district, stop, route = read_and_process_data()
+    district, stop, route = filter_by_cluster(district, stop, route, ["白石", "大殿", "湯田"])
+    return district, stop, route
+
+
+def get_stop_from_point(district: gpd.GeoDataFrame, lat: float, lng: float) -> str:
+    row = district[district.contains(Point(lng, lat))]
+    if row.empty:
+        return ""
+    return row.iloc[0]["name"]
+
+
+def generate_map(district: gpd.GeoDataFrame, stop: gpd.GeoDataFrame, route: gpd.GeoDataFrame) -> tuple[folium.Map, folium.FeatureGroup]:
     m = folium.Map(location=(34.178293, 131.474129), zoom_start=15)
     score_cm = [tuple(rgb) for rgb in cmc.batlow.colors.tolist()]
     score_cm = LinearColormap(score_cm, vmin=0, vmax=10)
     score_cm.caption = "アクセス度"
-#   clusters = district["cluster"].unique().tolist()
-#   cluster_dict = {c: i for i, c in enumerate(clusters)}
-#   score_cm = linear.Set1_09.to_step(len(clusters)).scale(-0.5, len(clusters) + 0.5)
     folium.GeoJson(
         district,
         name="アクセス度",
         style_function=lambda x: {
             "fillColor": score_cm(x["properties"]["score"]),
-#           "fillColor": score_cm(cluster_dict[x["properties"]["cluster"]]),
             "color": "black",
             "weight": 1,
             "dashArray": "5, 5",
             "fillOpacity": 0.7,
         },
-        tooltip=folium.GeoJsonTooltip(fields=["S_NAME", "name", "type", "distance", "hindo", "score"]),
+        tooltip=folium.GeoJsonTooltip(
+            fields=["S_NAME", "name", "type", "score"],
+            aliases=["地域", "最寄り駅/バス停", "駅/バス停", "アクセス度"],
+            sticky=False,
+            ),
+        popup=folium.GeoJsonPopup(
+            fields=["S_NAME", "name", "type", "score", "distance", "hindo"],
+            aliases=["地域", "最寄り駅/バス停", "駅/バス停", "アクセス度", "最寄り駅/バス停までの距離", "運行本数(本/日)"],
+        ),
     ).add_to(m)
 
-    icon_colors = {"bus": "darkblue", "train": "darkred"}
-    popup = folium.GeoJsonPopup(fields=["NAME", "HINDO"])
-    folium.GeoJson(
-        stop,
-        name="駅・バス停",
-        popup=popup,
-        marker=folium.Marker(icon=folium.Icon(prefix='fa')),
-        style_function=lambda x: {
-            "icon": x["properties"]["TYPE"],
-            "markerColor": icon_colors[x["properties"]["TYPE"]],
-        },
-    ).add_to(m)
-
-    route_colors = {
-        "blue": "#43A9E2",
-        "green": "#76B000",
-        "red": "#D14020",
-        "orange": "#F19800",
-        "darkblue": "#1266A8",
-        "darkgreen": "#738300",
-        "darkred": "#983232",
-    }
+    route_colors = {"bus": "#1266A8", "train": "#983232"}
     folium.GeoJson(
         route,
         name="路線",
         style_function=lambda x: {
-            "color": route_colors[icon_colors[x["properties"]["TYPE"]]],
+            "color": route_colors[x["properties"]["TYPE"]],
             "weight": 3,
         },
     ).add_to(m)
     score_cm.add_to(m)
     folium.LayerControl().add_to(m)
-    return m
+
+    fg = folium.FeatureGroup(name="State bounds")
+    color_selected = {"bus": "lightblue", "train": "lightred"}
+    color_unselected = {"bus": "darkblue", "train": "darkred"}
+    folium.GeoJson(
+        stop,
+        marker=folium.Marker(icon=folium.Icon(prefix='fa')),
+        style_function=lambda x: {
+            "icon": x["properties"]["TYPE"],
+            "markerColor":
+                color_selected[x["properties"]["TYPE"]]
+                if x["properties"]["NAME"] == st.session_state["selected_stop"]
+                else color_unselected[x["properties"]["TYPE"]],
+        },
+    ).add_to(fg)
+    return m, fg
 
 
 def main():
+    if "last_object_clicked" not in st.session_state:
+        st.session_state["last_object_clicked"] = None
+    if "selected_stop" not in st.session_state:
+        st.session_state["selected_stop"] = ""
+
     st.set_page_config(
         page_title="山口市交通機関アクセス度マップ",
         page_icon="🚌",
@@ -84,10 +102,18 @@ def main():
         """
     )
 
-    district, stop, route = read_and_process_data()
-    district, stop, route = filter_by_cluster(district, stop, route, ["白石", "大殿", "湯田"])
-    map = generate_map(district, stop, route)
-    st_folium(map, use_container_width=True, height=720, returned_objects=[])
+    district, stop, route = get_data()
+    map, fg = generate_map(district, stop, route)
+    out = st_folium(map, feature_group_to_add=fg,
+                    use_container_width=True, height=720, returned_objects=["last_object_clicked"])
+    if (
+        out["last_object_clicked"]
+        and out["last_object_clicked"] != st.session_state["last_object_clicked"]
+    ):
+        st.session_state["last_object_clicked"] = out["last_object_clicked"]
+        stop = get_stop_from_point(district, **out["last_object_clicked"])
+        st.session_state["selected_stop"] = stop
+        st.rerun()
 
     st.markdown(
             """
