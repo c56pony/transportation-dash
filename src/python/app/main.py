@@ -10,9 +10,15 @@ from data import read_and_process_data, filter_by_cluster
 
 
 @st.cache_data()
-def get_data() -> tuple[gpd.GeoDataFrame, gpd.GeoDataFrame, gpd.GeoDataFrame]:
-    district, stop, route = read_and_process_data()
-    district, stop, route = filter_by_cluster(district, stop, route, ["白石", "大殿", "湯田"])
+def _read_and_process_data() -> tuple[gpd.GeoDataFrame, gpd.GeoDataFrame, gpd.GeoDataFrame]:
+    return read_and_process_data()
+
+
+@st.cache_data()
+def get_data(clusters: str) -> tuple[gpd.GeoDataFrame, gpd.GeoDataFrame, gpd.GeoDataFrame]:
+    district, stop, route = _read_and_process_data()
+    clusters = clusters.split("・")
+    district, stop, route = filter_by_cluster(district, stop, route, clusters)
     return district, stop, route
 
 
@@ -24,7 +30,8 @@ def get_stop_from_point(district: gpd.GeoDataFrame, lat: float, lng: float) -> s
 
 
 def generate_map(district: gpd.GeoDataFrame, stop: gpd.GeoDataFrame, route: gpd.GeoDataFrame) -> tuple[folium.Map, folium.FeatureGroup]:
-    m = folium.Map(location=(34.178293, 131.474129), zoom_start=15)
+    center = district.union_all().centroid
+    m = folium.Map(location=(center.y, center.x), zoom_start=13)
     score_cm = [tuple(rgb) for rgb in cmc.batlow.colors.tolist()]
     score_cm = LinearColormap(score_cm, vmin=0, vmax=10)
     score_cm.caption = "アクセス度"
@@ -64,7 +71,7 @@ def generate_map(district: gpd.GeoDataFrame, stop: gpd.GeoDataFrame, route: gpd.
     fg = folium.FeatureGroup(name="State bounds")
     color_selected = {"bus": "lightblue", "train": "lightred"}
     color_unselected = {"bus": "darkblue", "train": "darkred"}
-    folium.GeoJson(
+    markers = folium.GeoJson(
         stop,
         marker=folium.Marker(icon=folium.Icon(prefix='fa')),
         style_function=lambda x: {
@@ -74,7 +81,8 @@ def generate_map(district: gpd.GeoDataFrame, stop: gpd.GeoDataFrame, route: gpd.
                 if x["properties"]["NAME"] == st.session_state["selected_stop"]
                 else color_unselected[x["properties"]["TYPE"]],
         },
-    ).add_to(fg)
+    )
+    fg.add_child(markers)
     return m, fg
 
 
@@ -104,7 +112,20 @@ def main():
         """
     )
 
-    district, stop, route = get_data()
+    # clusterをプルダウンで選択し、get_dataに渡す
+    clusters = st.selectbox(
+        "地区を選択してください",
+        [
+            "大殿・白石・湯田",
+            "阿東・徳地・仁保・宮野",
+            "吉敷・大歳・平川",
+            "大内・小鯖",
+            "小郡・嘉川・佐山・阿知須",
+            "名田島・陶・鋳銭司・秋穂二島・秋穂",
+            "",
+        ],
+    )
+    district, stop, route = get_data(clusters)
     map, fg = generate_map(district, stop, route)
     out = st_folium(map, feature_group_to_add=fg,
                     use_container_width=True, height=720, returned_objects=["last_object_clicked"])
@@ -113,8 +134,7 @@ def main():
         and out["last_object_clicked"] != st.session_state["last_object_clicked"]
     ):
         st.session_state["last_object_clicked"] = out["last_object_clicked"]
-        stop = get_stop_from_point(district, **out["last_object_clicked"])
-        st.session_state["selected_stop"] = stop
+        st.session_state["selected_stop"] = get_stop_from_point(district, **out["last_object_clicked"])
         st.rerun()
 
     st.markdown(

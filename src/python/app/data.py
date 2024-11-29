@@ -240,7 +240,6 @@ def plot_score_hist(district: gpd.GeoDataFrame, key: str = "score", range: tuple
 if __name__ == "__main__":
     district, stop, route = read_and_process_data()
     print(district.cluster.value_counts())
-    print(district.shape, stop.shape, route.shape)
     print(f"{len(district)} districts, {len(stop)} stops, {len(route)} routes")
     district, stop, route = filter_by_cluster(district, stop, route, ["白石", "大殿", "湯田"])
     print(f"{len(district)} districts, {len(stop)} stops, {len(route)} routes")
