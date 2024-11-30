@@ -52,7 +52,7 @@ def generate_map(district: gpd.GeoDataFrame, stop: gpd.GeoDataFrame, route: gpd.
             ),
         popup=folium.GeoJsonPopup(
             fields=["S_NAME", "name", "type_ja", "score", "distance", "hindo"],
-            aliases=["地域", "最寄り駅/バス停", "・駅/バス停", "・アクセス度", "・距離", "・運行本数(本/日)"],
+            aliases=["地域", "最寄り駅/バス停", "・駅/バス停", "・アクセス度", "・距離(m)", "・運行本数(本/日)"],
         ),
     ).add_to(m)
 
