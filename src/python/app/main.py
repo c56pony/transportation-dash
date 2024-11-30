@@ -29,7 +29,7 @@ def get_stop_from_point(district: gpd.GeoDataFrame, lat: float, lng: float) -> s
     return row.iloc[0]["name"]
 
 
-def generate_map_and_features(district: gpd.GeoDataFrame, stop: gpd.GeoDataFrame, route: gpd.GeoDataFrame) -> tuple[folium.Map, list[folium.FeatureGroup]]:
+def generate_map_and_features(district: gpd.GeoDataFrame, stop: gpd.GeoDataFrame, route: gpd.GeoDataFrame) -> tuple[folium.Map, folium.FeatureGroup]:
     center_start = (34.178293, 131.474129)
     folium_map = folium.Map(location=center_start, zoom_start=14)
     score_cm = [tuple(rgb) for rgb in cmc.batlow.colors.tolist()]
@@ -62,6 +62,7 @@ def generate_map_and_features(district: gpd.GeoDataFrame, stop: gpd.GeoDataFrame
     color_unselected = {"bus": "darkblue", "train": "darkred"}
     markers = folium.GeoJson(
         stop,
+        name="駅・バス停",
         marker=folium.Marker(icon=folium.Icon(prefix='fa')),
         style_function=lambda x: {
             "icon": x["properties"]["TYPE"],
@@ -75,16 +76,15 @@ def generate_map_and_features(district: gpd.GeoDataFrame, stop: gpd.GeoDataFrame
     fg_markers.add_child(markers)
 
     route_colors = {"bus": "#1266A8", "train": "#983232"}
-    lines = folium.GeoJson(
+    folium.GeoJson(
         route,
+        name="路線",
         style_function=lambda x: {
             "color": route_colors[x["properties"]["TYPE"]],
             "weight": 3,
         },
-    )
-    fg_lines = folium.FeatureGroup(name="路線")
-    fg_lines.add_child(lines)
-    return folium_map, [fg_markers, fg_lines]
+    ).add_to(folium_map)
+    return folium_map, fg_markers
 
 
 def main():
@@ -126,12 +126,12 @@ def main():
     )
     district, stop, route = get_data(st.session_state["clusters"])
     center = district.union_all().centroid
-    folium_map, fgs = generate_map_and_features(district, stop, route)
+    folium_map, fg = generate_map_and_features(district, stop, route)
     out = st_folium(
         folium_map,
         key='new',
         center=(center.y, center.x),
-        feature_group_to_add=fgs,
+        feature_group_to_add=fg,
         use_container_width=True,
         height=720,
         returned_objects=["last_object_clicked"],
