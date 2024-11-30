@@ -29,12 +29,14 @@ def get_stop_from_point(district: gpd.GeoDataFrame, lat: float, lng: float) -> s
     return row.iloc[0]["name"]
 
 
-def generate_map(district: gpd.GeoDataFrame, stop: gpd.GeoDataFrame, route: gpd.GeoDataFrame) -> tuple[folium.Map, folium.FeatureGroup]:
-    center = district.union_all().centroid
-    m = folium.Map(location=(center.y, center.x), zoom_start=13)
+def generate_map_and_features(district: gpd.GeoDataFrame, stop: gpd.GeoDataFrame, route: gpd.GeoDataFrame) -> tuple[folium.Map, list[folium.FeatureGroup]]:
+    center_start = (34.178293, 131.474129)
+    folium_map = folium.Map(location=center_start, zoom_start=14)
     score_cm = [tuple(rgb) for rgb in cmc.batlow.colors.tolist()]
     score_cm = LinearColormap(score_cm, vmin=0, vmax=10)
     score_cm.caption = "アクセス度"
+    folium_map.add_child(score_cm)
+
     folium.GeoJson(
         district,
         name="アクセス度",
@@ -54,20 +56,8 @@ def generate_map(district: gpd.GeoDataFrame, stop: gpd.GeoDataFrame, route: gpd.
             fields=["S_NAME", "name", "type_ja", "score", "distance", "hindo"],
             aliases=["地域", "最寄り駅/バス停", "・駅/バス停", "・アクセス度", "・距離(m)", "・運行本数(本/日)"],
         ),
-    ).add_to(m)
+    ).add_to(folium_map)
 
-    route_colors = {"bus": "#1266A8", "train": "#983232"}
-    folium.GeoJson(
-        route,
-        name="路線",
-        style_function=lambda x: {
-            "color": route_colors[x["properties"]["TYPE"]],
-            "weight": 3,
-        },
-    ).add_to(m)
-    score_cm.add_to(m)
-
-    fg = folium.FeatureGroup(name="駅・バス停")
     color_selected = {"bus": "lightblue", "train": "lightred"}
     color_unselected = {"bus": "darkblue", "train": "darkred"}
     markers = folium.GeoJson(
@@ -81,8 +71,20 @@ def generate_map(district: gpd.GeoDataFrame, stop: gpd.GeoDataFrame, route: gpd.
                 else color_unselected[x["properties"]["TYPE"]],
         },
     )
-    fg.add_child(markers)
-    return m, fg
+    fg_markers = folium.FeatureGroup(name="駅・バス停")
+    fg_markers.add_child(markers)
+
+    route_colors = {"bus": "#1266A8", "train": "#983232"}
+    lines = folium.GeoJson(
+        route,
+        style_function=lambda x: {
+            "color": route_colors[x["properties"]["TYPE"]],
+            "weight": 3,
+        },
+    )
+    fg_lines = folium.FeatureGroup(name="路線")
+    fg_lines.add_child(lines)
+    return folium_map, [fg_markers, fg_lines]
 
 
 def main():
@@ -111,8 +113,7 @@ def main():
         """
     )
 
-    # clusterをプルダウンで選択し、get_dataに渡す
-    clusters = st.selectbox(
+    st.session_state["clusters"] = st.selectbox(
         "地区を選択してください",
         [
             "大殿・白石・湯田",
@@ -121,14 +122,16 @@ def main():
             "大内・小鯖",
             "小郡・嘉川・佐山・阿知須",
             "名田島・陶・鋳銭司・秋穂二島・秋穂",
-            "",
         ],
     )
-    district, stop, route = get_data(clusters)
-    map, fg = generate_map(district, stop, route)
+    district, stop, route = get_data(st.session_state["clusters"])
+    center = district.union_all().centroid
+    folium_map, fgs = generate_map_and_features(district, stop, route)
     out = st_folium(
-        map,
-        feature_group_to_add=fg,
+        folium_map,
+        key='new',
+        center=(center.y, center.x),
+        feature_group_to_add=fgs,
         use_container_width=True,
         height=720,
         returned_objects=["last_object_clicked"],
