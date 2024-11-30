@@ -66,9 +66,8 @@ def generate_map(district: gpd.GeoDataFrame, stop: gpd.GeoDataFrame, route: gpd.
         },
     ).add_to(m)
     score_cm.add_to(m)
-    folium.LayerControl().add_to(m)
 
-    fg = folium.FeatureGroup(name="State bounds")
+    fg = folium.FeatureGroup(name="駅・バス停")
     color_selected = {"bus": "lightblue", "train": "lightred"}
     color_unselected = {"bus": "darkblue", "train": "darkred"}
     markers = folium.GeoJson(
@@ -127,8 +126,14 @@ def main():
     )
     district, stop, route = get_data(clusters)
     map, fg = generate_map(district, stop, route)
-    out = st_folium(map, feature_group_to_add=fg,
-                    use_container_width=True, height=720, returned_objects=["last_object_clicked"])
+    out = st_folium(
+        map,
+        feature_group_to_add=fg,
+        use_container_width=True,
+        height=720,
+        returned_objects=["last_object_clicked"],
+        layer_control=folium.LayerControl(),
+    )
     if (
         out["last_object_clicked"]
         and out["last_object_clicked"] != st.session_state["last_object_clicked"]
